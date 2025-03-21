@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useData } from '@/context/DataContext';
@@ -36,9 +35,10 @@ import {
   Search,
   Package,
   PackageOpen,
-  BarChart3
+  BarChart3,
+  Image
 } from 'lucide-react';
-import { CollectionItem } from '@/types';
+import { CollectionItem, MediaFile } from '@/types';
 import ItemForm from '@/components/ItemForm';
 import CollectionCard from '@/components/CollectionCard';
 import { useToast } from '@/components/ui/use-toast';
@@ -56,29 +56,26 @@ const Dashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [sortOrder, setSortOrder] = useState<'name' | 'price' | 'date'>('date');
+  const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   
-  // Filter items based on search term, category, and sort
   const filteredItems = collectionItems
     .filter(item => {
-      // Search term filter
       const matchesSearch = 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.notes && item.notes.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      // Category filter
       const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
       
       return matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
-      // Sort order
       if (sortOrder === 'name') {
         return a.name.localeCompare(b.name);
       } else if (sortOrder === 'price') {
         return b.price - a.price;
       } else {
-        // 'date'
         return new Date(b.acquisitionDate).getTime() - new Date(a.acquisitionDate).getTime();
       }
     });
@@ -121,6 +118,27 @@ const Dashboard: React.FC = () => {
     return condition.split('-').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
+  };
+
+  const handleViewMedia = (mediaFiles: MediaFile[], startIndex: number = 0) => {
+    if (!mediaFiles || mediaFiles.length === 0) return;
+    
+    setSelectedMediaIndex(startIndex);
+    setIsMediaViewerOpen(true);
+  };
+
+  const navigateMedia = (direction: 'next' | 'prev') => {
+    if (!selectedItem?.mediaFiles) return;
+    
+    if (direction === 'next') {
+      setSelectedMediaIndex((prev) => 
+        prev < selectedItem.mediaFiles!.length - 1 ? prev + 1 : 0
+      );
+    } else {
+      setSelectedMediaIndex((prev) => 
+        prev > 0 ? prev - 1 : selectedItem.mediaFiles!.length - 1
+      );
+    }
   };
 
   return (
@@ -278,7 +296,6 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Edit Item Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-auto">
           <DialogHeader>
@@ -299,7 +316,6 @@ const Dashboard: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Item Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
@@ -346,6 +362,33 @@ const Dashboard: React.FC = () => {
                     </div>
                   </div>
                 )}
+                
+                {selectedItem.mediaFiles && selectedItem.mediaFiles.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Media Files</h4>
+                    <div className="grid grid-cols-4 gap-2">
+                      {selectedItem.mediaFiles.map((file, index) => (
+                        <div 
+                          key={file.id}
+                          className="relative cursor-pointer rounded-md overflow-hidden border border-muted h-16"
+                          onClick={() => handleViewMedia(selectedItem.mediaFiles!, index)}
+                        >
+                          {file.type === 'image' ? (
+                            <img 
+                              src={file.url} 
+                              alt={file.name} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                              <Image className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </ScrollArea>
           )}
@@ -368,6 +411,101 @@ const Dashboard: React.FC = () => {
               Edit
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMediaViewerOpen} onOpenChange={setIsMediaViewerOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Media Viewer</DialogTitle>
+            {selectedItem?.mediaFiles && (
+              <DialogDescription>
+                {selectedMediaIndex + 1} of {selectedItem.mediaFiles.length}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[70vh]">
+            {selectedItem?.mediaFiles && selectedItem.mediaFiles.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  {selectedItem.mediaFiles[selectedMediaIndex].type === 'image' ? (
+                    <img 
+                      src={selectedItem.mediaFiles[selectedMediaIndex].url}
+                      alt={`Media ${selectedMediaIndex + 1}`}
+                      className="max-w-full max-h-[50vh] object-contain rounded-md"
+                    />
+                  ) : selectedItem.mediaFiles[selectedMediaIndex].type === 'video' ? (
+                    <video 
+                      src={selectedItem.mediaFiles[selectedMediaIndex].url}
+                      controls
+                      className="max-w-full max-h-[50vh] rounded-md"
+                    />
+                  ) : selectedItem.mediaFiles[selectedMediaIndex].type === 'audio' ? (
+                    <audio 
+                      src={selectedItem.mediaFiles[selectedMediaIndex].url}
+                      controls
+                      className="w-full"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center p-8 bg-muted rounded-md">
+                      <Image className="h-12 w-12 mb-2 text-muted-foreground" />
+                      <span>File preview not available</span>
+                      <a 
+                        href={selectedItem.mediaFiles[selectedMediaIndex].url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 text-primary underline"
+                      >
+                        Open file
+                      </a>
+                    </div>
+                  )}
+                </div>
+                
+                {selectedItem.mediaFiles.length > 1 && (
+                  <div className="flex justify-between px-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => navigateMedia('prev')}
+                    >
+                      Previous
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => navigateMedia('next')}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                  {selectedItem.mediaFiles.map((file, index) => (
+                    <div 
+                      key={file.id}
+                      className={`w-16 h-16 rounded-md overflow-hidden border-2 cursor-pointer ${
+                        selectedMediaIndex === index ? "border-primary" : "border-transparent"
+                      }`}
+                      onClick={() => setSelectedMediaIndex(index)}
+                    >
+                      {file.type === 'image' ? (
+                        <img 
+                          src={file.url} 
+                          alt={`Thumbnail ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-muted">
+                          <Image className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
     </Layout>

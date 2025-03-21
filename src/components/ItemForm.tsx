@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -106,8 +105,13 @@ const ItemForm: React.FC<ItemFormProps> = ({
   const onSubmit = async (data: ItemFormValues) => {
     try {
       const itemData = {
-        ...data,
+        name: data.name,
+        description: data.description,
+        condition: data.condition,
         price: Number(data.price),
+        acquisitionDate: data.acquisitionDate,
+        categoryId: data.categoryId,
+        notes: data.notes || '',
         mediaFiles,
       };
       
