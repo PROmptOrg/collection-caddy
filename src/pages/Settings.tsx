@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -15,10 +16,20 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { Loader2, Save, User, LogOut } from 'lucide-react';
+import { Loader2, Save, User, LogOut, Moon, Sun, Monitor } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ThemeMode, FontFamily } from '@/types';
 
 const Settings: React.FC = () => {
   const { user, logout } = useAuth();
+  const { theme, setTheme, font, setFont } = useTheme();
   const { toast } = useToast();
   
   const [name, setName] = useState(user?.name || '');
@@ -48,6 +59,14 @@ const Settings: React.FC = () => {
       });
     }
   };
+
+  const fontOptions: { value: FontFamily; label: string }[] = [
+    { value: 'inter', label: 'Inter (Default)' },
+    { value: 'roboto', label: 'Roboto' },
+    { value: 'playfair', label: 'Playfair Display' },
+    { value: 'montserrat', label: 'Montserrat' },
+    { value: 'opensans', label: 'Open Sans' },
+  ];
 
   return (
     <Layout>
@@ -124,25 +143,72 @@ const Settings: React.FC = () => {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Account Summary</CardTitle>
+                <CardTitle>Appearance</CardTitle>
+                <CardDescription>
+                  Customize how CollectiblesVault looks
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-center py-4">
-                  <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-10 w-10 text-primary" />
+              <CardContent className="space-y-6">
+                <div className="space-y-3">
+                  <Label>Theme</Label>
+                  <RadioGroup 
+                    value={theme} 
+                    onValueChange={(value) => setTheme(value as ThemeMode)}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="light" id="light" />
+                      <Label htmlFor="light" className="flex items-center gap-1 cursor-pointer">
+                        <Sun className="h-4 w-4" />
+                        <span>Light</span>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="dark" id="dark" />
+                      <Label htmlFor="dark" className="flex items-center gap-1 cursor-pointer">
+                        <Moon className="h-4 w-4" />
+                        <span>Dark</span>
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="system" id="system" />
+                      <Label htmlFor="system" className="flex items-center gap-1 cursor-pointer">
+                        <Monitor className="h-4 w-4" />
+                        <span>System</span>
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="font">Font</Label>
+                  <Select 
+                    value={font} 
+                    onValueChange={(value) => setFont(value as FontFamily)}
+                  >
+                    <SelectTrigger id="font" className="h-10">
+                      <SelectValue placeholder="Select a font" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fontOptions.map((option) => (
+                        <SelectItem 
+                          key={option.value} 
+                          value={option.value}
+                          className={`font-${option.value}`}
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="pt-3 text-sm">
+                    <p className={`font-${font} text-base`}>
+                      The quick brown fox jumps over the lazy dog.
+                    </p>
+                    <p className={`font-${font} text-sm mt-1 text-muted-foreground`}>
+                      Preview of the selected font
+                    </p>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Full Name</div>
-                  <div className="font-medium">{user?.name}</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Username</div>
-                  <div className="font-medium">{user?.username}</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">Email</div>
-                  <div className="font-medium">{user?.email}</div>
                 </div>
               </CardContent>
             </Card>
@@ -154,7 +220,7 @@ const Settings: React.FC = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Application</div>
-                  <div className="font-medium">CollectionCaddy</div>
+                  <div className="font-medium">CollectiblesVault</div>
                 </div>
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">Version</div>

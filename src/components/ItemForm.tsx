@@ -34,7 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CollectionItem } from '@/types';
+import { CollectionItem, MediaFile } from '@/types';
+import MediaUploader from './MediaUploader';
 
 const conditionOptions = [
   { value: 'mint', label: 'Mint' },
@@ -76,6 +77,7 @@ const ItemForm: React.FC<ItemFormProps> = ({
 }) => {
   const { addCollectionItem, updateCollectionItem, categories } = useData();
   const { toast } = useToast();
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>(item?.mediaFiles || []);
   
   const form = useForm<ItemFormValues>({
     resolver: zodResolver(itemSchema),
@@ -93,11 +95,20 @@ const ItemForm: React.FC<ItemFormProps> = ({
   const { formState } = form;
   const { isSubmitting } = formState;
 
+  const handleMediaAdd = (files: MediaFile[]) => {
+    setMediaFiles([...mediaFiles, ...files]);
+  };
+
+  const handleMediaRemove = (id: string) => {
+    setMediaFiles(mediaFiles.filter(file => file.id !== id));
+  };
+
   const onSubmit = async (data: ItemFormValues) => {
     try {
       const itemData = {
         ...data,
         price: Number(data.price),
+        mediaFiles,
       };
       
       if (isEdit && item) {
@@ -123,6 +134,7 @@ const ItemForm: React.FC<ItemFormProps> = ({
         categoryId: '',
         notes: '',
       });
+      setMediaFiles([]);
       
       if (onSuccess) {
         onSuccess();
@@ -313,7 +325,16 @@ const ItemForm: React.FC<ItemFormProps> = ({
           )}
         />
 
-        <Button type="submit" className="w-full h-11" disabled={isSubmitting}>
+        <div className="pt-2">
+          <FormLabel className="block mb-2">Media Files</FormLabel>
+          <MediaUploader
+            mediaFiles={mediaFiles}
+            onMediaAdd={handleMediaAdd}
+            onMediaRemove={handleMediaRemove}
+          />
+        </div>
+
+        <Button type="submit" className="w-full h-11 mt-6" disabled={isSubmitting}>
           {isEdit ? 'Update Item' : 'Add Item'}
         </Button>
       </form>

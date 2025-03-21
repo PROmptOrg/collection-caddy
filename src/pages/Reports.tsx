@@ -22,11 +22,12 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Save, FilePlus, Calendar, FolderTree, DollarSign } from 'lucide-react';
+import { BarChart3, Save, FilePlus, Calendar, FolderTree, DollarSign, Download } from 'lucide-react';
 import ReportForm from '@/components/ReportForm';
 import { CollectionItem, TimeRange } from '@/types';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
+import { exportCollectionToExcel } from '@/utils/excelExport';
 
 type ReportData = {
   name: string;
@@ -89,6 +90,33 @@ const Reports: React.FC = () => {
       title: 'Report saved',
       description: 'The report has been saved successfully.',
     });
+  };
+  
+  const handleExportExcel = () => {
+    if (!report) return;
+    
+    try {
+      exportCollectionToExcel(
+        report.items, 
+        categories, 
+        { 
+          fileName: `${report.name.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}`,
+          sheetName: report.name
+        }
+      );
+      
+      toast({
+        title: 'Export successful',
+        description: 'The report has been exported to Excel.',
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: 'Export failed',
+        description: 'There was an error exporting the report.',
+        variant: 'destructive',
+      });
+    }
   };
   
   const handlePrintReport = () => {
@@ -175,8 +203,12 @@ const Reports: React.FC = () => {
                       <Save className="h-4 w-4 mr-1" />
                       Save
                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                      <Download className="h-4 w-4 mr-1" />
+                      Export Excel
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handlePrintReport}>
-                      Export
+                      Print
                     </Button>
                   </div>
                 </div>

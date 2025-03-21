@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import { cn } from '@/lib/utils';
 import {
   LayoutGrid,
@@ -12,7 +13,9 @@ import {
   Menu,
   X,
   LogOut,
-  User
+  User,
+  Moon,
+  Sun
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +30,7 @@ import { useToast } from '@/components/ui/use-toast';
 
 const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -49,13 +53,17 @@ const Navbar: React.FC = () => {
     navigate('/');
   };
 
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full bg-background/80 backdrop-blur-sm border-b">
       <div className="container max-w-7xl py-4 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Link to="/dashboard" className="flex items-center space-x-2 text-xl font-semibold">
-              <span className="hidden sm:inline-block">CollectionCaddy</span>
+              <span className="hidden sm:inline-block">CollectiblesVault</span>
             </Link>
           </div>
 
@@ -82,6 +90,20 @@ const Navbar: React.FC = () => {
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              className="rounded-full"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">

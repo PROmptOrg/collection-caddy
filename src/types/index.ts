@@ -24,6 +24,16 @@ export interface CollectionItem {
   categoryName?: string;
   notes?: string;
   imageUrl?: string;
+  mediaFiles?: MediaFile[];
+  createdAt: Date;
+}
+
+export interface MediaFile {
+  id: string;
+  name: string;
+  type: 'image' | 'video' | 'audio' | 'document';
+  url: string;
+  thumbnailUrl?: string;
   createdAt: Date;
 }
 
@@ -48,3 +58,7 @@ export interface Report {
 }
 
 export type TimeRange = 'week' | 'month' | 'quarter' | 'year' | 'custom';
+
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+export type FontFamily = 'inter' | 'roboto' | 'playfair' | 'montserrat' | 'opensans';
