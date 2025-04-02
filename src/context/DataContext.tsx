@@ -157,6 +157,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user_id: user.id
       };
       
+      console.log("Adding category with data:", newCategory);
+      
       // Use insert with single object, not array
       const { data, error } = await supabase
         .from('categories')
