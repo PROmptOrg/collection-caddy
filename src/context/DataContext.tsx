@@ -3,6 +3,7 @@ import { Category, CollectionItem, WishlistItem, Report } from '@/types';
 import { useAuth } from './AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { v4 as uuidv4 } from 'uuid';
 
 interface DataContextProps {
   categories: Category[];
@@ -38,10 +39,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (user) {
-      // Load user data from Supabase when user signs in
       loadDataFromSupabase();
     } else {
-      // Clear data when user signs out
       setCategories([]);
       setCollectionItems([]);
       setWishlistItems([]);
@@ -50,12 +49,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, [user]);
 
-  // Load data from Supabase
   const loadDataFromSupabase = async () => {
     try {
       setIsLoading(true);
       
-      // Load categories
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('categories')
         .select('*');
@@ -71,7 +68,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCategories(formattedCategories);
       }
       
-      // Load collection items
       const { data: itemsData, error: itemsError } = await supabase
         .from('collection_items')
         .select('*, categories(name)');
@@ -95,7 +91,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCollectionItems(formattedItems);
       }
       
-      // Load wishlist items
       const { data: wishlistData, error: wishlistError } = await supabase
         .from('wishlist_items')
         .select('*, categories(name)');
@@ -114,7 +109,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setWishlistItems(formattedWishlist);
       }
       
-      // Load reports
       const { data: reportsData, error: reportsError } = await supabase
         .from('reports')
         .select('*');
@@ -145,21 +139,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Categories
   const addCategory = async (category: Omit<Category, 'id' | 'createdAt'>) => {
     try {
       if (!user) throw new Error("User not authenticated");
       
-      // Make sure category has all required fields with defined values
+      let userId = user.id;
+      if (!isValidUUID(userId)) {
+        userId = uuidv4();
+        console.log(`Converting mock user ID "${user.id}" to UUID format: ${userId}`);
+      }
+      
       const newCategory = {
         name: category.name,
         description: category.description,
-        user_id: user.id
+        user_id: userId
       };
       
       console.log("Adding category with data:", newCategory);
       
-      // Use insert with single object, not array
       const { data, error } = await supabase
         .from('categories')
         .insert(newCategory)
@@ -196,11 +193,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const isValidUUID = (uuid: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  };
+
   const updateCategory = async (id: string, category: Partial<Category>) => {
     try {
       if (!user) throw new Error("User not authenticated");
       
-      // Create an object with the database column names
       const updateData: any = {};
       if (category.name) updateData.name = category.name;
       if (category.description) updateData.description = category.description;
@@ -219,14 +220,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setCategories(updatedCategories);
       
-      // Update category names in collection items
       if (category.name) {
         const updatedItems = collectionItems.map(item => 
           item.categoryId === id ? { ...item, categoryName: category.name } : item
         );
         setCollectionItems(updatedItems);
         
-        // Update category names in wishlist items
         const updatedWishlist = wishlistItems.map(item => 
           item.categoryId === id ? { ...item, categoryName: category.name } : item
         );
@@ -249,7 +248,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteCategory = async (id: string) => {
     try {
-      // Check if there are items using this category
       const hasItems = collectionItems.some(item => item.categoryId === id);
       const hasWishlistItems = wishlistItems.some(item => item.categoryId === id);
       
@@ -289,7 +287,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Collection Items
   const addCollectionItem = async (item: Omit<CollectionItem, 'id' | 'createdAt'>) => {
     try {
       if (!user) throw new Error("User not authenticated");
@@ -334,7 +331,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         setCollectionItems(prev => [...prev, formattedItem]);
         
-        // Add media files if there are any
         if (item.mediaFiles && item.mediaFiles.length > 0) {
           for (const file of item.mediaFiles) {
             const mediaFile = {
@@ -375,7 +371,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         categoryName = category?.name;
       }
       
-      // Format the item for Supabase
       const updateData: any = {};
       
       if (item.name) updateData.name = item.name;
@@ -395,9 +390,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (error) throw error;
       
-      // Update media files if there are any
       if (item.mediaFiles) {
-        // First get the current media files to identify which ones to delete
         const { data: existingMedia } = await supabase
           .from('media_files')
           .select('*')
@@ -407,14 +400,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const existingIds = new Set(existingMedia.map(media => media.id));
           const newMediaIds = new Set(item.mediaFiles.map(media => media.id));
           
-          // Delete media files that are no longer in the list
           for (const media of existingMedia) {
             if (!newMediaIds.has(media.id)) {
               await supabase.from('media_files').delete().eq('id', media.id);
             }
           }
           
-          // Add new media files
           for (const file of item.mediaFiles) {
             if (!existingIds.has(file.id)) {
               const mediaFile = {
@@ -485,7 +476,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Wishlist Items
   const addWishlistItem = async (item: Omit<WishlistItem, 'id' | 'createdAt'>) => {
     try {
       if (!user) throw new Error("User not authenticated");
@@ -546,7 +536,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         categoryName = category?.name;
       }
       
-      // Format the item for Supabase
       const updateData: any = {};
       
       if (item.name) updateData.name = item.name;
@@ -615,7 +604,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Reports
   const addReport = async (report: Omit<Report, 'id' | 'createdAt'>) => {
     try {
       if (!user) throw new Error("User not authenticated");
@@ -694,7 +682,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Getters
   const getCategoryById = (id: string) => {
     return categories.find(category => category.id === id);
   };
