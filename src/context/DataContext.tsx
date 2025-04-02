@@ -1,8 +1,7 @@
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Category, CollectionItem, WishlistItem, Report } from '@/types';
 import { useAuth } from './AuthContext';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DataContextProps {
@@ -28,10 +27,6 @@ interface DataContextProps {
 }
 
 const DataContext = createContext<DataContextProps | undefined>(undefined);
-
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 11);
-}
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -155,19 +150,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error("User not authenticated");
       
+      // Make sure category has all required fields with defined values
       const newCategory = {
         name: category.name,
         description: category.description,
         user_id: user.id
       };
       
+      // Use insert with single object, not array
       const { data, error } = await supabase
         .from('categories')
-        .insert([newCategory])
+        .insert(newCategory)
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
       
       if (data) {
         const formattedCategory: Category = {
