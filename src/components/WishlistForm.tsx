@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { WishlistItem } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
 
 const wishlistItemSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -68,9 +69,12 @@ const WishlistForm: React.FC<WishlistFormProps> = ({
 
   const onSubmit = async (data: WishlistFormValues) => {
     try {
+      // Create a complete item object with all required fields
       const itemData = {
-        ...data,
+        name: data.name,
+        description: data.description,
         price: Number(data.price),
+        categoryId: data.categoryId,
       };
       
       if (isEdit && item) {

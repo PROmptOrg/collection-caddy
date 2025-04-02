@@ -3,6 +3,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Category, CollectionItem, WishlistItem, Report } from '@/types';
 import { useAuth } from './AuthContext';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface DataContextProps {
   categories: Category[];
@@ -42,8 +43,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (user) {
-      // Load user data from localStorage when user signs in
-      loadData();
+      // Load user data from Supabase when user signs in
+      loadDataFromSupabase();
     } else {
       // Clear data when user signs out
       setCategories([]);
@@ -54,31 +55,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(false);
   }, [user]);
 
-  // Load data from localStorage
-  const loadData = () => {
+  // Load data from Supabase
+  const loadDataFromSupabase = async () => {
     try {
-      const userId = user?.id;
-      if (!userId) return;
-
-      const storedCategories = localStorage.getItem(`${userId}_categories`);
-      const storedItems = localStorage.getItem(`${userId}_items`);
-      const storedWishlist = localStorage.getItem(`${userId}_wishlist`);
-      const storedReports = localStorage.getItem(`${userId}_reports`);
-
-      if (storedCategories) setCategories(JSON.parse(storedCategories));
-      if (storedItems) setCollectionItems(JSON.parse(storedItems));
-      if (storedWishlist) setWishlistItems(JSON.parse(storedWishlist));
-      if (storedReports) setReports(JSON.parse(storedReports));
-
-      // Set initial sample data if none exists
-      if (!storedCategories) {
-        const sampleCategories: Category[] = [
-          { id: '1', name: 'Books', description: 'Literary collections', createdAt: new Date() },
-          { id: '2', name: 'Coins', description: 'Numismatic collection', createdAt: new Date() },
-        ];
-        setCategories(sampleCategories);
-        saveToStorage(`${userId}_categories`, sampleCategories);
+      setIsLoading(true);
+      
+      // Load categories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*');
+      
+      if (categoriesError) throw categoriesError;
+      if (categoriesData) setCategories(categoriesData as Category[]);
+      
+      // Load collection items
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('collection_items')
+        .select('*, categories(name)');
+      
+      if (itemsError) throw itemsError;
+      if (itemsData) {
+        const formattedItems = itemsData.map(item => ({
+          ...item,
+          categoryName: item.categories?.name,
+          acquisitionDate: new Date(item.acquisition_date),
+          createdAt: new Date(item.created_at)
+        }));
+        setCollectionItems(formattedItems as CollectionItem[]);
       }
+      
+      // Load wishlist items
+      const { data: wishlistData, error: wishlistError } = await supabase
+        .from('wishlist_items')
+        .select('*, categories(name)');
+      
+      if (wishlistError) throw wishlistError;
+      if (wishlistData) {
+        const formattedWishlist = wishlistData.map(item => ({
+          ...item,
+          categoryName: item.categories?.name,
+          createdAt: new Date(item.created_at)
+        }));
+        setWishlistItems(formattedWishlist as WishlistItem[]);
+      }
+      
+      // Load reports
+      const { data: reportsData, error: reportsError } = await supabase
+        .from('reports')
+        .select('*');
+      
+      if (reportsError) throw reportsError;
+      if (reportsData) {
+        const formattedReports = reportsData.map(report => ({
+          ...report,
+          startDate: report.start_date ? new Date(report.start_date) : undefined,
+          endDate: report.end_date ? new Date(report.end_date) : undefined,
+          createdAt: new Date(report.created_at)
+        }));
+        setReports(formattedReports as Report[]);
+      }
+      
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -86,267 +122,545 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: 'There was a problem loading your collection data.',
         variant: 'destructive',
       });
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  // Save data to localStorage
-  const saveToStorage = (key: string, data: any) => {
-    if (!user) return;
-    localStorage.setItem(key, JSON.stringify(data));
   };
 
   // Categories
-  const addCategory = (category: Omit<Category, 'id' | 'createdAt'>) => {
-    const newCategory: Category = {
-      ...category,
-      id: generateId(),
-      createdAt: new Date(),
-    };
-    
-    const updatedCategories = [...categories, newCategory];
-    setCategories(updatedCategories);
-    
-    if (user) {
-      saveToStorage(`${user.id}_categories`, updatedCategories);
-    }
-    
-    toast({
-      title: 'Category added',
-      description: `"${category.name}" has been added to your categories.`,
-    });
-  };
-
-  const updateCategory = (id: string, category: Partial<Category>) => {
-    const updatedCategories = categories.map(cat => 
-      cat.id === id ? { ...cat, ...category } : cat
-    );
-    
-    setCategories(updatedCategories);
-    
-    if (user) {
-      saveToStorage(`${user.id}_categories`, updatedCategories);
-    }
-    
-    // Update category names in collection items
-    if (category.name) {
-      const updatedItems = collectionItems.map(item => 
-        item.categoryId === id ? { ...item, categoryName: category.name } : item
-      );
-      setCollectionItems(updatedItems);
+  const addCategory = async (category: Omit<Category, 'id' | 'createdAt'>) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
       
-      if (user) {
-        saveToStorage(`${user.id}_items`, updatedItems);
+      const newCategory = {
+        ...category,
+        user_id: user.id
+      };
+      
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([newCategory])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        const formattedCategory: Category = {
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          createdAt: new Date(data.created_at)
+        };
+        
+        setCategories(prev => [...prev, formattedCategory]);
+        
+        toast({
+          title: 'Category added',
+          description: `"${category.name}" has been added to your categories.`,
+        });
       }
-      
-      // Update category names in wishlist items
-      const updatedWishlist = wishlistItems.map(item => 
-        item.categoryId === id ? { ...item, categoryName: category.name } : item
-      );
-      setWishlistItems(updatedWishlist);
-      
-      if (user) {
-        saveToStorage(`${user.id}_wishlist`, updatedWishlist);
-      }
-    }
-    
-    toast({
-      title: 'Category updated',
-      description: `The category has been updated successfully.`,
-    });
-  };
-
-  const deleteCategory = (id: string) => {
-    // Check if there are items using this category
-    const hasItems = collectionItems.some(item => item.categoryId === id);
-    const hasWishlistItems = wishlistItems.some(item => item.categoryId === id);
-    
-    if (hasItems || hasWishlistItems) {
+    } catch (error: any) {
+      console.error('Error adding category:', error);
       toast({
-        title: 'Cannot delete category',
-        description: 'This category is in use by one or more items in your collection or wishlist.',
+        title: 'Error adding category',
+        description: error.message || 'There was a problem adding the category.',
         variant: 'destructive',
       });
-      return;
     }
-    
-    const updatedCategories = categories.filter(cat => cat.id !== id);
-    setCategories(updatedCategories);
-    
-    if (user) {
-      saveToStorage(`${user.id}_categories`, updatedCategories);
+  };
+
+  const updateCategory = async (id: string, category: Partial<Category>) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { error } = await supabase
+        .from('categories')
+        .update(category)
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const updatedCategories = categories.map(cat => 
+        cat.id === id ? { ...cat, ...category } : cat
+      );
+      
+      setCategories(updatedCategories);
+      
+      // Update category names in collection items
+      if (category.name) {
+        const updatedItems = collectionItems.map(item => 
+          item.categoryId === id ? { ...item, categoryName: category.name } : item
+        );
+        setCollectionItems(updatedItems);
+        
+        // Update category names in wishlist items
+        const updatedWishlist = wishlistItems.map(item => 
+          item.categoryId === id ? { ...item, categoryName: category.name } : item
+        );
+        setWishlistItems(updatedWishlist);
+      }
+      
+      toast({
+        title: 'Category updated',
+        description: `The category has been updated successfully.`,
+      });
+    } catch (error: any) {
+      console.error('Error updating category:', error);
+      toast({
+        title: 'Error updating category',
+        description: error.message || 'There was a problem updating the category.',
+        variant: 'destructive',
+      });
     }
-    
-    toast({
-      title: 'Category deleted',
-      description: 'The category has been deleted successfully.',
-    });
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      // Check if there are items using this category
+      const hasItems = collectionItems.some(item => item.categoryId === id);
+      const hasWishlistItems = wishlistItems.some(item => item.categoryId === id);
+      
+      if (hasItems || hasWishlistItems) {
+        toast({
+          title: 'Cannot delete category',
+          description: 'This category is in use by one or more items in your collection or wishlist.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      if (!user) throw new Error("User not authenticated");
+      
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const updatedCategories = categories.filter(cat => cat.id !== id);
+      setCategories(updatedCategories);
+      
+      toast({
+        title: 'Category deleted',
+        description: 'The category has been deleted successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: 'Error deleting category',
+        description: error.message || 'There was a problem deleting the category.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Collection Items
-  const addCollectionItem = (item: Omit<CollectionItem, 'id' | 'createdAt'>) => {
-    const category = categories.find(cat => cat.id === item.categoryId);
-    
-    const newItem: CollectionItem = {
-      ...item,
-      id: generateId(),
-      categoryName: category?.name,
-      createdAt: new Date(),
-    };
-    
-    const updatedItems = [...collectionItems, newItem];
-    setCollectionItems(updatedItems);
-    
-    if (user) {
-      saveToStorage(`${user.id}_items`, updatedItems);
-    }
-    
-    toast({
-      title: 'Item added',
-      description: `"${item.name}" has been added to your collection.`,
-    });
-  };
-
-  const updateCollectionItem = (id: string, item: Partial<CollectionItem>) => {
-    // If categoryId is being updated, get the category name
-    let categoryName;
-    if (item.categoryId) {
+  const addCollectionItem = async (item: Omit<CollectionItem, 'id' | 'createdAt'>) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
       const category = categories.find(cat => cat.id === item.categoryId);
-      categoryName = category?.name;
+      
+      const newItem = {
+        name: item.name,
+        description: item.description,
+        condition: item.condition,
+        price: item.price,
+        acquisition_date: item.acquisitionDate,
+        category_id: item.categoryId,
+        notes: item.notes || null,
+        image_url: item.imageUrl || null,
+        user_id: user.id
+      };
+      
+      const { data, error } = await supabase
+        .from('collection_items')
+        .insert([newItem])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        const formattedItem: CollectionItem = {
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          condition: data.condition,
+          price: data.price,
+          acquisitionDate: new Date(data.acquisition_date),
+          categoryId: data.category_id,
+          categoryName: category?.name,
+          notes: data.notes || undefined,
+          imageUrl: data.image_url || undefined,
+          mediaFiles: [],
+          createdAt: new Date(data.created_at)
+        };
+        
+        setCollectionItems(prev => [...prev, formattedItem]);
+        
+        // Add media files if there are any
+        if (item.mediaFiles && item.mediaFiles.length > 0) {
+          for (const file of item.mediaFiles) {
+            const mediaFile = {
+              name: file.name,
+              type: file.type,
+              url: file.url,
+              thumbnail_url: file.thumbnailUrl || null,
+              item_id: data.id,
+              user_id: user.id
+            };
+            
+            await supabase.from('media_files').insert([mediaFile]);
+          }
+        }
+        
+        toast({
+          title: 'Item added',
+          description: `"${item.name}" has been added to your collection.`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error adding collection item:', error);
+      toast({
+        title: 'Error adding item',
+        description: error.message || 'There was a problem adding the item.',
+        variant: 'destructive',
+      });
     }
-    
-    const updatedItems = collectionItems.map(collectionItem => 
-      collectionItem.id === id ? { 
-        ...collectionItem, 
-        ...item,
-        ...(categoryName ? { categoryName } : {})
-      } : collectionItem
-    );
-    
-    setCollectionItems(updatedItems);
-    
-    if (user) {
-      saveToStorage(`${user.id}_items`, updatedItems);
-    }
-    
-    toast({
-      title: 'Item updated',
-      description: 'The item has been updated successfully.',
-    });
   };
 
-  const deleteCollectionItem = (id: string) => {
-    const updatedItems = collectionItems.filter(item => item.id !== id);
-    setCollectionItems(updatedItems);
-    
-    if (user) {
-      saveToStorage(`${user.id}_items`, updatedItems);
+  const updateCollectionItem = async (id: string, item: Partial<CollectionItem>) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      let categoryName;
+      if (item.categoryId) {
+        const category = categories.find(cat => cat.id === item.categoryId);
+        categoryName = category?.name;
+      }
+      
+      // Format the item for Supabase
+      const updateData: any = {};
+      
+      if (item.name) updateData.name = item.name;
+      if (item.description) updateData.description = item.description;
+      if (item.condition) updateData.condition = item.condition;
+      if (item.price !== undefined) updateData.price = item.price;
+      if (item.acquisitionDate) updateData.acquisition_date = item.acquisitionDate;
+      if (item.categoryId) updateData.category_id = item.categoryId;
+      if (item.notes !== undefined) updateData.notes = item.notes || null;
+      if (item.imageUrl !== undefined) updateData.image_url = item.imageUrl || null;
+      
+      const { error } = await supabase
+        .from('collection_items')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      // Update media files if there are any
+      if (item.mediaFiles) {
+        // First get the current media files to identify which ones to delete
+        const { data: existingMedia } = await supabase
+          .from('media_files')
+          .select('*')
+          .eq('item_id', id);
+        
+        if (existingMedia) {
+          const existingIds = new Set(existingMedia.map(media => media.id));
+          const newMediaIds = new Set(item.mediaFiles.map(media => media.id));
+          
+          // Delete media files that are no longer in the list
+          for (const media of existingMedia) {
+            if (!newMediaIds.has(media.id)) {
+              await supabase.from('media_files').delete().eq('id', media.id);
+            }
+          }
+          
+          // Add new media files
+          for (const file of item.mediaFiles) {
+            if (!existingIds.has(file.id)) {
+              const mediaFile = {
+                name: file.name,
+                type: file.type,
+                url: file.url,
+                thumbnail_url: file.thumbnailUrl || null,
+                item_id: id,
+                user_id: user.id
+              };
+              
+              await supabase.from('media_files').insert([mediaFile]);
+            }
+          }
+        }
+      }
+      
+      const updatedItems = collectionItems.map(collectionItem => 
+        collectionItem.id === id ? { 
+          ...collectionItem, 
+          ...item,
+          ...(categoryName ? { categoryName } : {})
+        } : collectionItem
+      );
+      
+      setCollectionItems(updatedItems);
+      
+      toast({
+        title: 'Item updated',
+        description: 'The item has been updated successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error updating collection item:', error);
+      toast({
+        title: 'Error updating item',
+        description: error.message || 'There was a problem updating the item.',
+        variant: 'destructive',
+      });
     }
-    
-    toast({
-      title: 'Item deleted',
-      description: 'The item has been deleted from your collection.',
-    });
+  };
+
+  const deleteCollectionItem = async (id: string) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { error } = await supabase
+        .from('collection_items')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const updatedItems = collectionItems.filter(item => item.id !== id);
+      setCollectionItems(updatedItems);
+      
+      toast({
+        title: 'Item deleted',
+        description: 'The item has been deleted from your collection.',
+      });
+    } catch (error: any) {
+      console.error('Error deleting collection item:', error);
+      toast({
+        title: 'Error deleting item',
+        description: error.message || 'There was a problem deleting the item.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Wishlist Items
-  const addWishlistItem = (item: Omit<WishlistItem, 'id' | 'createdAt'>) => {
-    const category = categories.find(cat => cat.id === item.categoryId);
-    
-    const newItem: WishlistItem = {
-      ...item,
-      id: generateId(),
-      categoryName: category?.name,
-      createdAt: new Date(),
-    };
-    
-    const updatedItems = [...wishlistItems, newItem];
-    setWishlistItems(updatedItems);
-    
-    if (user) {
-      saveToStorage(`${user.id}_wishlist`, updatedItems);
-    }
-    
-    toast({
-      title: 'Wishlist item added',
-      description: `"${item.name}" has been added to your wishlist.`,
-    });
-  };
-
-  const updateWishlistItem = (id: string, item: Partial<WishlistItem>) => {
-    // If categoryId is being updated, get the category name
-    let categoryName;
-    if (item.categoryId) {
+  const addWishlistItem = async (item: Omit<WishlistItem, 'id' | 'createdAt'>) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
       const category = categories.find(cat => cat.id === item.categoryId);
-      categoryName = category?.name;
+      
+      const newItem = {
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        category_id: item.categoryId,
+        user_id: user.id
+      };
+      
+      const { data, error } = await supabase
+        .from('wishlist_items')
+        .insert([newItem])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        const formattedItem: WishlistItem = {
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          price: data.price,
+          categoryId: data.category_id,
+          categoryName: category?.name,
+          createdAt: new Date(data.created_at)
+        };
+        
+        setWishlistItems(prev => [...prev, formattedItem]);
+        
+        toast({
+          title: 'Wishlist item added',
+          description: `"${item.name}" has been added to your wishlist.`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error adding wishlist item:', error);
+      toast({
+        title: 'Error adding wishlist item',
+        description: error.message || 'There was a problem adding the wishlist item.',
+        variant: 'destructive',
+      });
     }
-    
-    const updatedItems = wishlistItems.map(wishlistItem => 
-      wishlistItem.id === id ? { 
-        ...wishlistItem, 
-        ...item,
-        ...(categoryName ? { categoryName } : {})
-      } : wishlistItem
-    );
-    
-    setWishlistItems(updatedItems);
-    
-    if (user) {
-      saveToStorage(`${user.id}_wishlist`, updatedItems);
-    }
-    
-    toast({
-      title: 'Wishlist item updated',
-      description: 'The wishlist item has been updated successfully.',
-    });
   };
 
-  const deleteWishlistItem = (id: string) => {
-    const updatedItems = wishlistItems.filter(item => item.id !== id);
-    setWishlistItems(updatedItems);
-    
-    if (user) {
-      saveToStorage(`${user.id}_wishlist`, updatedItems);
+  const updateWishlistItem = async (id: string, item: Partial<WishlistItem>) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      let categoryName;
+      if (item.categoryId) {
+        const category = categories.find(cat => cat.id === item.categoryId);
+        categoryName = category?.name;
+      }
+      
+      // Format the item for Supabase
+      const updateData: any = {};
+      
+      if (item.name) updateData.name = item.name;
+      if (item.description) updateData.description = item.description;
+      if (item.price !== undefined) updateData.price = item.price;
+      if (item.categoryId) updateData.category_id = item.categoryId;
+      
+      const { error } = await supabase
+        .from('wishlist_items')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const updatedItems = wishlistItems.map(wishlistItem => 
+        wishlistItem.id === id ? { 
+          ...wishlistItem, 
+          ...item,
+          ...(categoryName ? { categoryName } : {})
+        } : wishlistItem
+      );
+      
+      setWishlistItems(updatedItems);
+      
+      toast({
+        title: 'Wishlist item updated',
+        description: 'The wishlist item has been updated successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error updating wishlist item:', error);
+      toast({
+        title: 'Error updating wishlist item',
+        description: error.message || 'There was a problem updating the wishlist item.',
+        variant: 'destructive',
+      });
     }
-    
-    toast({
-      title: 'Wishlist item deleted',
-      description: 'The item has been removed from your wishlist.',
-    });
+  };
+
+  const deleteWishlistItem = async (id: string) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { error } = await supabase
+        .from('wishlist_items')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const updatedItems = wishlistItems.filter(item => item.id !== id);
+      setWishlistItems(updatedItems);
+      
+      toast({
+        title: 'Wishlist item deleted',
+        description: 'The item has been removed from your wishlist.',
+      });
+    } catch (error: any) {
+      console.error('Error deleting wishlist item:', error);
+      toast({
+        title: 'Error deleting wishlist item',
+        description: error.message || 'There was a problem deleting the wishlist item.',
+        variant: 'destructive',
+      });
+    }
   };
 
   // Reports
-  const addReport = (report: Omit<Report, 'id' | 'createdAt'>) => {
-    const newReport: Report = {
-      ...report,
-      id: generateId(),
-      createdAt: new Date(),
-    };
-    
-    const updatedReports = [...reports, newReport];
-    setReports(updatedReports);
-    
-    if (user) {
-      saveToStorage(`${user.id}_reports`, updatedReports);
+  const addReport = async (report: Omit<Report, 'id' | 'createdAt'>) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      const newReport = {
+        name: report.name,
+        type: report.type,
+        start_date: report.startDate || null,
+        end_date: report.endDate || null,
+        category_id: report.categoryId || null,
+        user_id: user.id
+      };
+      
+      const { data, error } = await supabase
+        .from('reports')
+        .insert([newReport])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        const formattedReport: Report = {
+          id: data.id,
+          name: data.name,
+          type: data.type,
+          startDate: data.start_date ? new Date(data.start_date) : undefined,
+          endDate: data.end_date ? new Date(data.end_date) : undefined,
+          categoryId: data.category_id || undefined,
+          createdAt: new Date(data.created_at)
+        };
+        
+        setReports(prev => [...prev, formattedReport]);
+        
+        toast({
+          title: 'Report created',
+          description: `"${report.name}" report has been created.`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error creating report:', error);
+      toast({
+        title: 'Error creating report',
+        description: error.message || 'There was a problem creating the report.',
+        variant: 'destructive',
+      });
     }
-    
-    toast({
-      title: 'Report created',
-      description: `"${report.name}" report has been created.`,
-    });
   };
 
-  const deleteReport = (id: string) => {
-    const updatedReports = reports.filter(report => report.id !== id);
-    setReports(updatedReports);
-    
-    if (user) {
-      saveToStorage(`${user.id}_reports`, updatedReports);
+  const deleteReport = async (id: string) => {
+    try {
+      if (!user) throw new Error("User not authenticated");
+      
+      const { error } = await supabase
+        .from('reports')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      const updatedReports = reports.filter(report => report.id !== id);
+      setReports(updatedReports);
+      
+      toast({
+        title: 'Report deleted',
+        description: 'The report has been deleted successfully.',
+      });
+    } catch (error: any) {
+      console.error('Error deleting report:', error);
+      toast({
+        title: 'Error deleting report',
+        description: error.message || 'There was a problem deleting the report.',
+        variant: 'destructive',
+      });
     }
-    
-    toast({
-      title: 'Report deleted',
-      description: 'The report has been deleted successfully.',
-    });
   };
 
   // Getters
