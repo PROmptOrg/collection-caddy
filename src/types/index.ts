@@ -1,4 +1,5 @@
 
+
 export interface User {
   id: string;
   name: string;
@@ -62,3 +63,4 @@ export type TimeRange = 'week' | 'month' | 'quarter' | 'year' | 'custom';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export type FontFamily = 'inter' | 'roboto' | 'playfair' | 'montserrat' | 'opensans';
+
