@@ -59,7 +59,12 @@ const CategoryForm: React.FC<CategoryFormProps> = ({
           description: `${data.name} has been updated successfully.`,
         });
       } else {
-        addCategory(data);
+        // Ensure data has required properties and they're non-optional
+        const categoryData = {
+          name: data.name,
+          description: data.description,
+        };
+        addCategory(categoryData);
         toast({
           title: 'Category added',
           description: `${data.name} has been added to your categories.`,

@@ -66,7 +66,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select('*');
       
       if (categoriesError) throw categoriesError;
-      if (categoriesData) setCategories(categoriesData as Category[]);
+      if (categoriesData) {
+        const formattedCategories: Category[] = categoriesData.map(cat => ({
+          id: cat.id,
+          name: cat.name,
+          description: cat.description,
+          createdAt: new Date(cat.created_at)
+        }));
+        setCategories(formattedCategories);
+      }
       
       // Load collection items
       const { data: itemsData, error: itemsError } = await supabase
@@ -75,13 +83,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (itemsError) throw itemsError;
       if (itemsData) {
-        const formattedItems = itemsData.map(item => ({
-          ...item,
-          categoryName: item.categories?.name,
+        const formattedItems: CollectionItem[] = itemsData.map(item => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          condition: item.condition,
+          price: item.price,
           acquisitionDate: new Date(item.acquisition_date),
+          categoryId: item.category_id || '',
+          categoryName: item.categories?.name,
+          notes: item.notes || undefined,
+          imageUrl: item.image_url || undefined,
+          mediaFiles: [],
           createdAt: new Date(item.created_at)
         }));
-        setCollectionItems(formattedItems as CollectionItem[]);
+        setCollectionItems(formattedItems);
       }
       
       // Load wishlist items
@@ -91,12 +107,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (wishlistError) throw wishlistError;
       if (wishlistData) {
-        const formattedWishlist = wishlistData.map(item => ({
-          ...item,
+        const formattedWishlist: WishlistItem[] = wishlistData.map(item => ({
+          id: item.id,
+          name: item.name,
+          description: item.description,
+          price: item.price,
+          categoryId: item.category_id || '',
           categoryName: item.categories?.name,
           createdAt: new Date(item.created_at)
         }));
-        setWishlistItems(formattedWishlist as WishlistItem[]);
+        setWishlistItems(formattedWishlist);
       }
       
       // Load reports
@@ -106,13 +126,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (reportsError) throw reportsError;
       if (reportsData) {
-        const formattedReports = reportsData.map(report => ({
-          ...report,
+        const formattedReports: Report[] = reportsData.map(report => ({
+          id: report.id,
+          name: report.name,
+          type: report.type as "time" | "category",
           startDate: report.start_date ? new Date(report.start_date) : undefined,
           endDate: report.end_date ? new Date(report.end_date) : undefined,
+          categoryId: report.category_id || undefined,
           createdAt: new Date(report.created_at)
         }));
-        setReports(formattedReports as Report[]);
+        setReports(formattedReports);
       }
       
     } catch (error) {
@@ -133,7 +156,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!user) throw new Error("User not authenticated");
       
       const newCategory = {
-        ...category,
+        name: category.name,
+        description: category.description,
         user_id: user.id
       };
       
@@ -174,9 +198,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error("User not authenticated");
       
+      // Create an object with the database column names
+      const updateData: any = {};
+      if (category.name) updateData.name = category.name;
+      if (category.description) updateData.description = category.description;
+      
       const { error } = await supabase
         .from('categories')
-        .update(category)
+        .update(updateData)
         .eq('id', id)
         .eq('user_id', user.id);
       
@@ -270,7 +299,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: item.description,
         condition: item.condition,
         price: item.price,
-        acquisition_date: item.acquisitionDate,
+        acquisition_date: item.acquisitionDate.toISOString(),
         category_id: item.categoryId,
         notes: item.notes || null,
         image_url: item.imageUrl || null,
@@ -351,7 +380,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (item.description) updateData.description = item.description;
       if (item.condition) updateData.condition = item.condition;
       if (item.price !== undefined) updateData.price = item.price;
-      if (item.acquisitionDate) updateData.acquisition_date = item.acquisitionDate;
+      if (item.acquisitionDate) updateData.acquisition_date = item.acquisitionDate.toISOString();
       if (item.categoryId) updateData.category_id = item.categoryId;
       if (item.notes !== undefined) updateData.notes = item.notes || null;
       if (item.imageUrl !== undefined) updateData.image_url = item.imageUrl || null;
@@ -592,8 +621,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newReport = {
         name: report.name,
         type: report.type,
-        start_date: report.startDate || null,
-        end_date: report.endDate || null,
+        start_date: report.startDate ? report.startDate.toISOString() : null,
+        end_date: report.endDate ? report.endDate.toISOString() : null,
         category_id: report.categoryId || null,
         user_id: user.id
       };
@@ -610,7 +639,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const formattedReport: Report = {
           id: data.id,
           name: data.name,
-          type: data.type,
+          type: data.type as "time" | "category",
           startDate: data.start_date ? new Date(data.start_date) : undefined,
           endDate: data.end_date ? new Date(data.end_date) : undefined,
           categoryId: data.category_id || undefined,
