@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Category, CollectionItem, WishlistItem, Report } from '@/types';
 import { useAuth } from './AuthContext';
@@ -78,7 +77,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('categories')
         .select('*');
       
-      if (categoriesError) throw categoriesError;
+      if (categoriesError) {
+        console.error('Error loading categories:', categoriesError);
+        throw categoriesError;
+      }
+      
       if (categoriesData) {
         const formattedCategories: Category[] = categoriesData.map(cat => ({
           id: cat.id,
@@ -93,7 +96,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('collection_items')
         .select('*, categories(name)');
       
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Error loading collection items:', itemsError);
+        throw itemsError;
+      }
+      
       if (itemsData) {
         const formattedItems: CollectionItem[] = itemsData.map(item => ({
           id: item.id,
@@ -116,7 +123,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('wishlist_items')
         .select('*, categories(name)');
       
-      if (wishlistError) throw wishlistError;
+      if (wishlistError) {
+        console.error('Error loading wishlist items:', wishlistError);
+        throw wishlistError;
+      }
+      
       if (wishlistData) {
         const formattedWishlist: WishlistItem[] = wishlistData.map(item => ({
           id: item.id,
@@ -134,7 +145,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('reports')
         .select('*');
       
-      if (reportsError) throw reportsError;
+      if (reportsError) {
+        console.error('Error loading reports:', reportsError);
+        throw reportsError;
+      }
+      
       if (reportsData) {
         const formattedReports: Report[] = reportsData.map(report => ({
           id: report.id,
@@ -164,16 +179,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       if (!user) throw new Error("User not authenticated");
       
-      let userId = user.id;
-      if (!isValidUUID(userId)) {
-        userId = generateUUID();
-        console.log(`Converting mock user ID "${user.id}" to UUID format: ${userId}`);
-      }
-      
       const newCategory = {
         name: category.name,
         description: category.description,
-        user_id: userId
+        user_id: user.id
       };
       
       console.log("Adding category with data:", newCategory);
@@ -212,11 +221,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: 'destructive',
       });
     }
-  };
-
-  const isValidUUID = (uuid: string) => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    return uuidRegex.test(uuid);
   };
 
   const updateCategory = async (id: string, category: Partial<Category>) => {

@@ -2,5 +2,5 @@
 project_id = "yefzzlfrirsfjzcsdcbo"
 
 [auth]
-site_url = "https://localhost:5173" # Replace with your app URL in production
-additional_redirect_urls = ["https://localhost:5173"]
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
