@@ -1,9 +1,30 @@
+
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Category, CollectionItem, WishlistItem, Report } from '@/types';
 import { useAuth } from './AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
+
+// Generate a valid UUID v4
+const generateUUID = () => {
+  // This implementation creates a valid UUID v4 without external dependencies
+  const hex = '0123456789abcdef';
+  let uuid = '';
+  
+  for (let i = 0; i < 36; i++) {
+    if (i === 8 || i === 13 || i === 18 || i === 23) {
+      uuid += '-';
+    } else if (i === 14) {
+      uuid += '4'; // Version 4
+    } else if (i === 19) {
+      uuid += hex[(Math.random() * 4) | 8]; // Variant
+    } else {
+      uuid += hex[Math.floor(Math.random() * 16)];
+    }
+  }
+  
+  return uuid;
+};
 
 interface DataContextProps {
   categories: Category[];
@@ -145,7 +166,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       let userId = user.id;
       if (!isValidUUID(userId)) {
-        userId = uuidv4();
+        userId = generateUUID();
         console.log(`Converting mock user ID "${user.id}" to UUID format: ${userId}`);
       }
       
