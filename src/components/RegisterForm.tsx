@@ -20,7 +20,7 @@ import { Loader2 } from 'lucide-react';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
+  username: z.string().min(3, 'Username must be at least 3 characters').optional(),
   email: z.string().email('Please enter a valid email'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
@@ -52,7 +52,7 @@ const RegisterForm: React.FC = () => {
 
   const onSubmit = async (data: RegisterFormValues) => {
     try {
-      await register(data.name, data.username, data.password, data.email);
+      await register(data.name, data.email, data.password, data.username);
       toast({
         title: 'Registration successful',
         description: 'Your account has been created. Welcome to CollectionCaddy!',
@@ -94,7 +94,7 @@ const RegisterForm: React.FC = () => {
           name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Username</FormLabel>
+              <FormLabel>Username (Optional)</FormLabel>
               <FormControl>
                 <Input 
                   placeholder="Choose a username" 

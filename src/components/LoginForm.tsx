@@ -19,7 +19,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
+  email: z.string().email('Please enter a valid email'),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -33,7 +33,7 @@ const LoginForm: React.FC = () => {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: '',
+      email: '',
       password: '',
     },
   });
@@ -43,7 +43,7 @@ const LoginForm: React.FC = () => {
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
-      await login(data.username, data.password);
+      await login(data.email, data.password);
       toast({
         title: 'Login successful',
         description: 'Welcome back to your collection dashboard!',
@@ -63,15 +63,15 @@ const LoginForm: React.FC = () => {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="username"
+          name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Username</FormLabel>
+              <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input 
-                  placeholder="Enter your username" 
+                  placeholder="Enter your email" 
                   {...field} 
-                  autoComplete="username"
+                  autoComplete="email"
                   className="h-11"
                 />
               </FormControl>
